@@ -1,0 +1,44 @@
+# C# / .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+n8n/instruction.md
+
+instruction.md
