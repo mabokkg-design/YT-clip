@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YT AI Clip</title>
+  <style>
+    :root {
+      --bg: #111010;
+      --bg-card: #191919;
+      --bg-input: #222;
+      --text: #f1eee7;
+      --muted: #777;
+      --border: #282828;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --red: #f87171;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2.5rem 1rem 4rem;
+    }
+
+    .wrap { max-width: 700px; margin: 0 auto; }
+
+    /* Header */
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p { color: var(--muted); margin-top: 0.45rem; font-size: 0.88rem; }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.6rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Form elements */
+    .field { margin-bottom: 1rem; }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 0.45rem;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      color: var(--text);
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #444; }
+    textarea { resize: vertical; line-height: 1.5; }
+    select option { background: var(--bg-input); }
+
+    /* Row layout */
+    .row { display: flex; gap: 0.75rem; }
+    .row input, .row select { flex: 1; }
+
+    /* Buttons */
+    button {
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      padding: 0.72rem 1.4rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    button:hover { opacity: 0.82; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    button.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-weight: 500;
+    }
+    button.ghost:hover { color: var(--text); border-color: #444; opacity: 1; }
+    button.sm { padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+
+    /* Options expander */
+    details summary {
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      list-style: none;
+      user-select: none;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: "▸ "; }
+    details[open] summary::before { content: "▾ "; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+    .span2 { grid-column: 1 / -1; }
+
+    /* Status */
+    #status-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    #status-card .card-title { font-weight: 600; font-size: 0.95rem; }
+
+    .status-list { list-style: none; }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.48rem 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .status-item:last-child { border-bottom: none; }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--muted);
+    }
+    .dot.spin { background: var(--blue); animation: pulse 1.2s ease-in-out infinite; }
+    .dot.ok   { background: var(--green); }
+    .dot.fail { background: var(--red); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50%       { transform: scale(0.75); opacity: 0.55; }
+    }
+
+    .job-badge {
+      margin-top: 0.9rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-input);
+      border-radius: 7px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .job-badge span { color: var(--text); }
+
+    /* Results */
+    .clip-block {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem;
+      margin-top: 0.9rem;
+    }
+    .clip-block:first-child { margin-top: 0; }
+    .clip-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.55rem; }
+    .clip-caption { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin-bottom: 0.7rem; }
+    .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.9rem; }
+    .tag {
+      background: var(--bg-input);
+      border-radius: 5px;
+      padding: 0.18rem 0.55rem;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .clip-actions { display: flex; gap: 0.6rem; }
+
+    /* Divider */
+    .divider {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin: 1.75rem 0;
+      position: relative;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%; height: 1px;
+      width: 44%;
+      background: var(--border);
+    }
+    .divider::before { left: 0; }
+    .divider::after  { right: 0; }
+
+    /* Alerts */
+    .alert {
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 7px;
+    }
+    .alert.error { background: #2a1212; color: var(--red); }
+    .alert.info  { background: #12181f; color: var(--blue); }
+
+    /* My Clips */
+    .myclips-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .myclips-header h2 { font-size: 0.95rem; font-weight: 600; }
+
+    .job-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    .job-row:last-child { border-bottom: none; }
+
+    .job-status-badge {
+      flex-shrink: 0;
+      padding: 0.2rem 0.55rem;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .badge-completed { background: #0d2b1a; color: var(--green); }
+    .badge-failed    { background: #2a1212; color: var(--red); }
+    .badge-other     { background: #12181f; color: var(--blue); }
+
+    .job-meta { flex: 1; min-width: 0; }
+    .job-meta-id {
+      font-family: monospace;
+      font-size: 0.76rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .job-clip-title { font-weight: 500; margin-bottom: 0.2rem; }
+    .job-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+    .shorts-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    @media (max-width: 480px) { .shorts-row { flex-direction: column; } }
+
+    .num-btns { display: flex; gap: 0.5rem; }
+    .num-btn {
+      flex: 1;
+      background: var(--bg-input);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .num-btn:hover { border-color: #444; color: var(--text); opacity: 1; }
+    .num-btn.active {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+
+    .style-btns { display: flex; gap: 0.5rem; }
+    .style-btn {
+      flex: 1;
+      background: var(--bg-input);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .style-btn:hover { border-color: #444; color: var(--text); opacity: 1; }
+    .style-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+    .hidden { display: none !important; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .options-grid { grid-template-columns: 1fr; }
+      .row { flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>YT AI Clip</h1>
+    <p>Turn long YouTube videos into multiple AI shorts &middot; Powered by Reka AI</p>
+  </header>
+
+  <!-- Generator -->
+  <div class="card" id="gen-card">
+    <div class="field">
+      <label>YouTube URL</label>
+      <input type="url" id="video-url" placeholder="https://www.youtube.com/watch?v=..." />
+    </div>
+
+    <div class="shorts-row">
+      <div class="field" style="flex:1">
+        <label>Number of Shorts</label>
+        <div class="num-btns" id="num-btns">
+          <button class="num-btn" data-n="1">1</button>
+          <button class="num-btn" data-n="2">2</button>
+          <button class="num-btn active" data-n="3">3</button>
+        </div>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Quality</label>
+        <div class="num-btns" id="res-btns">
+          <button class="num-btn" data-r="720">720p</button>
+          <button class="num-btn active" data-r="1080">1080p</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="shorts-row">
+      <div class="field" style="flex:1">
+        <label>Style</label>
+        <div class="style-btns" id="style-btns">
+          <button class="style-btn active" data-style="viral">Viral</button>
+          <button class="style-btn" data-style="professional">Pro</button>
+          <button class="style-btn" data-style="educational">Edu</button>
+        </div>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Aspect Ratio</label>
+        <select id="opt-ratio">
+          <option value="9:16">9:16 — Portrait (Shorts)</option>
+          <option value="16:9">16:9 — Landscape</option>
+          <option value="1:1">1:1 — Square</option>
+          <option value="4:5">4:5</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="gen-btn" onclick="startGenerate()" style="width:100%;margin-top:0.25rem">Generate Shorts</button>
+
+    <details id="opts">
+      <summary>Advanced options</summary>
+      <div class="options-grid">
+        <div class="field">
+          <label>Template</label>
+          <select id="opt-template">
+            <option value="moments">Moments</option>
+            <option value="compilation">Compilation</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Max Duration (s)</label>
+          <input type="number" id="opt-max" value="60" min="1" />
+        </div>
+        <div class="field span2">
+          <label>Prompt</label>
+          <textarea id="opt-prompt" rows="2">Create a highly engaging, attention-grabbing short video with the most exciting and surprising moments. Prioritize hooks, reactions, and peak energy moments that will make viewers stop scrolling.</textarea>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Status -->
+  <div class="card hidden" id="status-card">
+    <div class="card-header">
+      <span class="card-title" id="status-title">Generating&hellip;</span>
+      <button class="ghost sm" onclick="cancelJob()">Cancel</button>
+    </div>
+    <ul class="status-list" id="status-list"></ul>
+    <div class="job-badge hidden" id="job-badge">Job ID: <span id="job-id"></span></div>
+    <div class="alert error hidden" id="gen-error"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="card hidden" id="results-card">
+    <div class="card-header" style="margin-bottom:0.9rem">
+      <span style="font-weight:600; color:var(--green)" id="results-title">&#10003; Shorts ready</span>
+      <button class="ghost sm" onclick="resetAll()">New clip</button>
+    </div>
+    <div id="clips-out"></div>
+  </div>
+
+  <!-- Check existing job -->
+  <div class="divider">or check an existing job</div>
+
+  <div class="card">
+    <div class="field">
+      <label>Job ID</label>
+      <div class="row">
+        <input type="text" id="check-id" placeholder="Paste job ID&hellip;" />
+        <button class="ghost" onclick="checkJob()">Check Status</button>
+      </div>
+    </div>
+    <div id="check-out"></div>
+  </div>
+
+  <!-- My Clips -->
+  <div class="divider">my clips</div>
+
+  <div class="card" id="myclips-card">
+    <div class="myclips-header">
+      <h2>My Clips</h2>
+      <button class="ghost sm" id="refresh-btn" onclick="loadMyClips()">Load</button>
+    </div>
+    <div id="myclips-out"><span style="color:var(--muted);font-size:0.88rem">Click Load to fetch your clips.</span></div>
+  </div>
+
+</div>
+
+<script>
+  const clipUrls = {};
+  let genController = null;
+  let selectedNum = 3;
+  let selectedRes = 1080;
+  let selectedStyle = "viral";
+
+  const STYLE_PROMPTS = {
+    viral:        "Create a highly engaging, attention-grabbing short video with the most exciting and surprising moments. Prioritize hooks, reactions, and peak energy moments that will make viewers stop scrolling.",
+    professional: "Create a polished, professional short video highlighting the key insights, expertise, and most informative moments. Clean transitions, clear messaging, suitable for LinkedIn or business audiences.",
+    educational:  "Create a clear, informative short video highlighting the most educational and valuable moments. Focus on tips, explanations, and takeaways that teach the viewer something useful.",
+  };
+
+  // Number selector
+  document.getElementById("num-btns").addEventListener("click", e => {
+    const btn = e.target.closest(".num-btn");
+    if (!btn) return;
+    document.querySelectorAll("#num-btns .num-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedNum = parseInt(btn.dataset.n, 10);
+  });
+
+  // Resolution selector
+  document.getElementById("res-btns").addEventListener("click", e => {
+    const btn = e.target.closest(".num-btn");
+    if (!btn) return;
+    document.querySelectorAll("#res-btns .num-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedRes = parseInt(btn.dataset.r, 10);
+  });
+
+  // Style selector
+  document.getElementById("style-btns").addEventListener("click", e => {
+    const btn = e.target.closest(".style-btn");
+    if (!btn) return;
+    document.querySelectorAll(".style-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedStyle = btn.dataset.style;
+    // Update the prompt textarea to match the selected style
+    document.getElementById("opt-prompt").value = STYLE_PROMPTS[selectedStyle];
+  });
+
+  function startGenerate() {
+    const url = document.getElementById("video-url").value.trim();
+    if (!url) { document.getElementById("video-url").focus(); return; }
+
+    const payload = {
+      video_url: url,
+      prompt: document.getElementById("opt-prompt").value.trim() || STYLE_PROMPTS[selectedStyle],
+      template: document.getElementById("opt-template").value,
+      aspect_ratio: document.getElementById("opt-ratio").value,
+      min_duration: 0,
+      max_duration: parseInt(document.getElementById("opt-max").value) || 60,
+      subtitles: true,
+      num_generations: selectedNum,
+      resolution: selectedRes,
+      layout: "ai",
+    };
+
+    // Reset UI
+    document.getElementById("gen-btn").disabled = true;
+    document.getElementById("status-card").classList.remove("hidden");
+    document.getElementById("results-card").classList.add("hidden");
+    document.getElementById("status-list").innerHTML = "";
+    document.getElementById("job-badge").classList.add("hidden");
+    document.getElementById("gen-error").classList.add("hidden");
+    document.getElementById("status-title").textContent = `Generating ${selectedNum} short${selectedNum > 1 ? "s" : ""}…`;
+
+    genController = new AbortController();
+
+    fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: genController.signal,
+    })
+    .then(res => {
+      if (!res.ok) return res.json().then(e => { throw new Error(e.detail || "Server error"); });
+      streamResponse(res.body);
+    })
+    .catch(err => {
+      if (err.name !== "AbortError") showGenError(err.message);
+    });
+  }
+
+  function streamResponse(body) {
+    const reader = body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    const seenStatuses = [];
+
+    function pump() {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try { handleEvent(JSON.parse(line.slice(6)), seenStatuses); } catch (_) {}
+        }
+        pump();
+      }).catch(err => {
+        if (err.name !== "AbortError") showGenError(err.message);
+      });
+    }
+    pump();
+  }
+
+  function handleEvent(data, seenStatuses) {
+    if (data.error) { showGenError(data.error); return; }
+
+    if (data.id && document.getElementById("job-badge").classList.contains("hidden")) {
+      document.getElementById("job-id").textContent = data.id;
+      document.getElementById("job-badge").classList.remove("hidden");
+    }
+
+    const status = data.status || "unknown";
+
+    if (!seenStatuses.includes(status)) {
+      // Mark previous active dot as done
+      document.querySelectorAll("#status-list .dot.spin").forEach(d => {
+        d.classList.remove("spin");
+        d.classList.add("ok");
+      });
+
+      const isDone  = status === "completed";
+      const isFail  = status === "failed";
+      const dotCls  = isDone ? "ok" : isFail ? "fail" : "spin";
+
+      const li = document.createElement("li");
+      li.className = "status-item";
+      li.innerHTML = `<span class="dot ${dotCls}"></span>${cap(status)}`;
+      document.getElementById("status-list").appendChild(li);
+      seenStatuses.push(status);
+    }
+
+    if (status === "completed" && data.output) { showResults(data.output); }
+    if (status === "failed") showGenError(data.error_message || "Job failed");
+  }
+
+  function showResults(output) {
+    document.getElementById("gen-btn").disabled = false;
+    document.getElementById("status-title").textContent = "Done";
+    document.getElementById("results-title").textContent = `✓ ${output.length} short${output.length > 1 ? "s" : ""} ready`;
+    document.getElementById("results-card").classList.remove("hidden");
+    const out = document.getElementById("clips-out");
+    out.innerHTML = "";
+    output.forEach((clip, i) => {
+      clipUrls[i] = clip.video_url || "";
+      const tags = (clip.hashtags || []).map(h => `<span class="tag">${esc(h)}</span>`).join("");
+      const block = document.createElement("div");
+      block.className = "clip-block";
+      block.innerHTML = `
+        <div class="clip-title">${esc(clip.title || "Untitled")}</div>
+        <div class="clip-caption">${esc(clip.caption || "")}</div>
+        ${tags ? `<div class="tags">${tags}</div>` : ""}
+        <div class="clip-actions">
+          <a href="${esc(clip.video_url || "#")}" target="_blank" rel="noopener">
+            <button>Download clip</button>
+          </a>
+          <button class="ghost" data-idx="${i}" onclick="copyClipUrl(this)">Copy URL</button>
+        </div>
+      `;
+      out.appendChild(block);
+    });
+  }
+
+  function showGenError(msg) {
+    document.getElementById("gen-btn").disabled = false;
+    document.getElementById("status-title").textContent = "Failed";
+    const el = document.getElementById("gen-error");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  }
+
+  function cancelJob() {
+    if (genController) genController.abort();
+    document.getElementById("status-card").classList.add("hidden");
+    document.getElementById("gen-btn").disabled = false;
+  }
+
+  function resetAll() {
+    cancelJob();
+    document.getElementById("results-card").classList.add("hidden");
+  }
+
+  // Copy URL by data-idx to avoid putting raw URLs in onclick
+  function copyClipUrl(btn) {
+    const idx = parseInt(btn.dataset.idx, 10);
+    const url = clipUrls[idx] || "";
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = orig; }, 1800);
+    });
+  }
+
+  // Check existing job
+  async function checkJob() {
+    const jobId = document.getElementById("check-id").value.trim();
+    if (!jobId) return;
+    const out = document.getElementById("check-out");
+    out.innerHTML = `<div class="alert info">Checking&hellip;</div>`;
+    try {
+      const res = await fetch(`/api/clips/${encodeURIComponent(jobId)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Unknown error");
+      renderCheckResult(data, out);
+    } catch (e) {
+      out.innerHTML = `<div class="alert error">${esc(e.message)}</div>`;
+    }
+  }
+
+  function renderCheckResult(data, out) {
+    const status = data.status || "unknown";
+    const statusColor = status === "completed" ? "var(--green)" : status === "failed" ? "var(--red)" : "var(--blue)";
+    let html = `<p style="margin-top:0.75rem;font-size:0.9rem">Status: <strong style="color:${statusColor}">${cap(status)}</strong></p>`;
+
+    if (status === "completed" && data.output?.length) {
+      data.output.forEach((clip, i) => {
+        const key = "check_" + i;
+        clipUrls[key] = clip.video_url || "";
+        const tags = (clip.hashtags || []).map(h => `<span class="tag">${esc(h)}</span>`).join("");
+        html += `
+          <div class="clip-block">
+            <div class="clip-title">${esc(clip.title || "Untitled")}</div>
+            <div class="clip-caption">${esc(clip.caption || "")}</div>
+            ${tags ? `<div class="tags">${tags}</div>` : ""}
+            <div class="clip-actions">
+              <a href="${esc(clip.video_url || "#")}" target="_blank" rel="noopener">
+                <button>Download clip</button>
+              </a>
+              <button class="ghost" data-idx="${key}" onclick="copyClipUrl(this)">Copy URL</button>
+            </div>
+          </div>`;
+      });
+    }
+    out.innerHTML = html;
+  }
+
+  // My Clips
+  async function loadMyClips() {
+    const out = document.getElementById("myclips-out");
+    const btn = document.getElementById("refresh-btn");
+    btn.disabled = true;
+    btn.textContent = "Loading…";
+    out.innerHTML = "";
+    try {
+      const res = await fetch("/api/clips");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to load clips");
+
+      const jobs = data.jobs || data.data || data || [];
+      if (!Array.isArray(jobs) || jobs.length === 0) {
+        out.innerHTML = `<span style="color:var(--muted);font-size:0.88rem">No clips found.</span>`;
+        return;
+      }
+
+      // Sort: completed first, then by id descending
+      const sorted = [...jobs].sort((a, b) => {
+        if (a.status === "completed" && b.status !== "completed") return -1;
+        if (b.status === "completed" && a.status !== "completed") return 1;
+        return (b.id || "").localeCompare(a.id || "");
+      });
+
+      out.innerHTML = "";
+      sorted.forEach((job, i) => {
+        const status  = job.status || "unknown";
+        const isDone  = status === "completed";
+        const isFail  = status === "failed";
+        const badgeCls = isDone ? "badge-completed" : isFail ? "badge-failed" : "badge-other";
+        const clips   = isDone && job.output?.length ? job.output : [];
+        const title   = clips[0]?.title || "";
+
+        const row = document.createElement("div");
+        row.className = "job-row";
+
+        let actionsHtml = "";
+        clips.forEach((clip, ci) => {
+          const key = `my_${i}_${ci}`;
+          clipUrls[key] = clip.video_url || "";
+          actionsHtml += `
+            <a href="${esc(clip.video_url || "#")}" target="_blank" rel="noopener">
+              <button class="sm">Download</button>
+            </a>
+            <button class="ghost sm" data-idx="${key}" onclick="copyClipUrl(this)">Copy URL</button>`;
+        });
+
+        row.innerHTML = `
+          <span class="job-status-badge ${badgeCls}">${cap(status)}</span>
+          <div class="job-meta">
+            ${title ? `<div class="job-clip-title">${esc(title)}</div>` : ""}
+            <div class="job-meta-id">${esc(job.id || "")}</div>
+            ${actionsHtml ? `<div class="job-actions">${actionsHtml}</div>` : ""}
+          </div>
+        `;
+        out.appendChild(row);
+      });
+    } catch (e) {
+      out.innerHTML = `<div class="alert error">${esc(e.message)}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Refresh";
+    }
+  }
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+</script>
+</body>
+</html>
