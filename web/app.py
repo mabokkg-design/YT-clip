@@ -19,6 +19,7 @@ from openai import OpenAI
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from moviepy import VideoFileClip, TextClip, CompositeVideoClip
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -175,15 +176,19 @@ def _video_dims(aspect_ratio: str, resolution: int) -> tuple[int, int]:
     return resolution, vid_h
 
 
-def _font_name() -> str:
-    """Use Montserrat if installed, fall back to Helvetica Neue (always on macOS)."""
-    font_dirs = ["/Library/Fonts", os.path.expanduser("~/Library/Fonts")]
-    targets = ("Montserrat-Bold.ttf", "Montserrat-Black.ttf", "Montserrat Bold.ttf")
-    for d in font_dirs:
-        for name in targets:
-            if os.path.exists(os.path.join(d, name)):
-                return "Montserrat"
-    return "Helvetica Neue"
+_FONTS_DIR = Path(__file__).parent / "fonts"
+
+def _font_path() -> str:
+    """Return path to Montserrat-Black.ttf, falling back to Helvetica Neue Bold."""
+    bundled = _FONTS_DIR / "Montserrat-Black.ttf"
+    if bundled.exists():
+        return str(bundled)
+    for d in ["/Library/Fonts", os.path.expanduser("~/Library/Fonts")]:
+        for name in ("Montserrat-Black.ttf", "Montserrat-Bold.ttf"):
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                return p
+    return "/System/Library/Fonts/HelveticaNeue.ttc"
 
 
 def chunk_transcript(transcript: list, clip_start: float, clip_end: float) -> list:
@@ -223,74 +228,70 @@ def chunk_transcript(transcript: list, clip_start: float, clip_end: float) -> li
     return chunks
 
 
-def generate_premium_ass(chunks: list, vid_w: int, vid_h: int) -> str:
+def build_caption_clips(chunks: list, vid_w: int, vid_h: int, clip_duration: float) -> list:
     """
-    Build an ASS subtitle file with clean, minimal captions.
-      - Montserrat Black / Helvetica Neue Bold, ALL CAPS
-      - Tight letter spacing (-1)
-      - Pure white body text, yellow (#FFD700) on the last word per chunk
-      - No shadow, no outline, no blur — fully clean
-      - Single straight line, no wrapping (WrapStyle=2, \\q2)
-      - Center-bottom at ~78% down the frame
-      - Instant cuts, no animation
+    Build MoviePy TextClip overlays — one per caption chunk.
+    - Montserrat Black, fontsize=70, ALL CAPS
+    - White body + yellow (#FFD700) last word, side-by-side on one line
+    - 1.5px black stroke for legibility on any background
+    - Centered horizontally, positioned at 78% down the frame
+    - Instant cuts, no animation
     """
-    font      = _font_name()
-    WHITE     = "&H00FFFFFF"   # #FFFFFF — primary text
-    YELLOW    = "&H0000D7FF"   # #FFD700 in ASS BGR order
-    font_size = int(vid_h * 0.038)  # 3.8vh equivalent
-    margin_v  = int(vid_h * 0.22)   # 22% from bottom ≈ 78% down
+    font     = _font_path()
+    FONTSIZE = 70
+    WHITE    = "white"
+    YELLOW   = "#FFD700"
+    STROKE   = "black"
+    SW       = 1.5  # stroke width — thin enough to be clean, thick enough to read
+    y_pos    = int(vid_h * 0.78)  # 78% down the frame
 
-    header = f"""\
-[Script Info]
-ScriptType: v4.00+
-PlayResX: {vid_w}
-PlayResY: {vid_h}
-WrapStyle: 2
-ScaledBorderAndShadow: yes
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{font_size},{WHITE},&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,-1,0,0,0,0,2,20,20,{margin_v},1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-
-    def fmt(s: float) -> str:
-        h = int(s // 3600)
-        m = int((s % 3600) // 60)
-        sec = s % 60
-        return f"{h}:{m:02d}:{sec:05.2f}"
-
-    lines = []
+    result = []
     for chunk in chunks:
         words   = chunk["words"]
         t_start = chunk["start"]
-        t_end   = chunk["end"]
+        t_end   = min(chunk["end"], clip_duration)
+        dur     = max(0.05, t_end - t_start)
+
+        def make_clip(text: str, color: str) -> TextClip:
+            return TextClip(
+                font=font, text=text, font_size=FONTSIZE,
+                color=color, stroke_color=STROKE, stroke_width=SW,
+                method="label",
+            )
 
         if len(words) == 1:
-            text = f"{{\\q2\\c{YELLOW}}}{words[0]}"
+            tc = (make_clip(words[0], YELLOW)
+                  .with_position(("center", y_pos - FONTSIZE // 2))
+                  .with_start(t_start).with_duration(dur))
+            result.append(tc)
         else:
-            body = " ".join(words[:-1])
-            last = words[-1]
-            text = f"{{\\q2\\c{WHITE}}}{body} {{\\c{YELLOW}}}{last}{{\\c{WHITE}}}"
+            body_text = " ".join(words[:-1]) + " "
+            last_text = words[-1]
+            body_tc   = make_clip(body_text, WHITE)
+            last_tc   = make_clip(last_text, YELLOW)
 
-        lines.append(f"Dialogue: 0,{fmt(t_start)},{fmt(t_end)},Default,,0,0,0,,{text}")
+            # Center the combined line
+            total_w = body_tc.w + last_tc.w
+            start_x = (vid_w - total_w) // 2
+            text_y  = y_pos - body_tc.h // 2
 
-    return header + "\n".join(lines) + "\n"
+            body_tc = (body_tc
+                       .with_position((start_x, text_y))
+                       .with_start(t_start).with_duration(dur))
+            last_tc = (last_tc
+                       .with_position((start_x + body_tc.w, text_y))
+                       .with_start(t_start).with_duration(dur))
+            result.extend([body_tc, last_tc])
+
+    return result
 
 
 async def cut_clip(input_path: str, output_path: str, start: int, end: int,
-                   aspect_ratio: str, resolution: int, ass_content: str = ""):
-    ass_path = output_path + ".ass"
+                   aspect_ratio: str, resolution: int, chunks: list = None):
     vf = _build_vf(aspect_ratio, resolution)
+    tmp_path = output_path + ".tmp.mp4"
 
-    if ass_content:
-        with open(ass_path, "w", encoding="utf-8") as f:
-            f.write(ass_content)
-        escaped = ass_path.replace("\\", "\\\\").replace(":", "\\:")
-        vf += f",ass={escaped}"
-
+    # Step 1: ffmpeg cuts + crops the video (fast, no quality loss on text)
     cmd = [
         "ffmpeg", "-y",
         "-ss", str(start), "-i", input_path,
@@ -298,20 +299,38 @@ async def cut_clip(input_path: str, output_path: str, start: int, end: int,
         "-vf", vf,
         "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
-        output_path,
+        tmp_path,
     ]
 
-    def _run():
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise RuntimeError(f"ffmpeg failed: {result.stderr[-500:]}")
-        finally:
-            if os.path.exists(ass_path):
-                os.remove(ass_path)
+    def _run_ffmpeg():
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {result.stderr[-500:]}")
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _run)
+    await loop.run_in_executor(None, _run_ffmpeg)
+
+    if not chunks:
+        os.rename(tmp_path, output_path)
+        return
+
+    # Step 2: MoviePy burns in TextClip captions
+    def _render_captions():
+        video = VideoFileClip(tmp_path)
+        try:
+            vid_w, vid_h = int(video.w), int(video.h)
+            caption_clips = build_caption_clips(chunks, vid_w, vid_h, video.duration)
+            final = CompositeVideoClip([video] + caption_clips)
+            final.write_videofile(
+                output_path, codec="libx264", audio_codec="aac",
+                fps=video.fps, preset="fast", logger=None,
+            )
+        finally:
+            video.close()
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    await loop.run_in_executor(None, _render_captions)
 
 
 async def process_job(job_id: str, req: GenerateRequest, api_key: str):
@@ -338,7 +357,6 @@ async def process_job(job_id: str, req: GenerateRequest, api_key: str):
             video_file = await download_video(req.video_url, tmpdir, req.resolution)
 
             job["status"] = "rendering"
-            vid_w, vid_h = _video_dims(req.aspect_ratio, req.resolution)
             output = []
             for i, moment in enumerate(moments):
                 clip_name  = f"{job_id}_{i}.mp4"
@@ -346,16 +364,15 @@ async def process_job(job_id: str, req: GenerateRequest, api_key: str):
                 clip_start = int(moment["start_seconds"])
                 clip_end   = int(moment["end_seconds"])
 
-                if req.subtitles:
-                    chunks = chunk_transcript(transcript, clip_start, clip_end)
-                    ass = generate_premium_ass(chunks, vid_w, vid_h)
-                else:
-                    ass = ""
+                caption_chunks = (
+                    chunk_transcript(transcript, clip_start, clip_end)
+                    if req.subtitles else []
+                )
 
                 await cut_clip(
                     video_file, clip_path,
                     clip_start, clip_end,
-                    req.aspect_ratio, req.resolution, ass,
+                    req.aspect_ratio, req.resolution, caption_chunks,
                 )
                 output.append({
                     "title": moment.get("title", f"Clip {i + 1}"),
