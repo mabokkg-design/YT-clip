@@ -121,7 +121,7 @@ def generate_premium_ass(chunks: list[dict], vid_w: int, vid_h: int) -> str:
     YELLOW   = "&H0000D7FF"   # #FFD700 in ASS BGR (Blue=00, Green=D7, Red=FF)
     SHADOW_C = "&H99000000"   # black @ 60% opacity  (0x99 = 153 ≈ 60% of 255)
 
-    font_size = 12
+    font_size = max(36, int(vid_h * 0.055))
     # 18% margin from bottom places text at ~82% down — sweet spot for shorts
     margin_v  = int(vid_h * 0.18)
 

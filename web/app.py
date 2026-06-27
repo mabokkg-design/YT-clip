@@ -237,7 +237,7 @@ def generate_premium_ass(chunks: list, vid_w: int, vid_h: int) -> str:
     WHITE     = "&H00FFFFFF"   # #FFFFFF  — primary text
     YELLOW    = "&H0000D7FF"   # #FFD700 in ASS BGR order
     SHADOW_C  = "&H80000000"   # black @ 50% alpha — soft, not cheap
-    font_size = 12
+    font_size = max(36, int(vid_h * 0.055))
     margin_v  = int(vid_h * 0.18)             # 18% from bottom ≈ 82% down
 
     header = f"""\
