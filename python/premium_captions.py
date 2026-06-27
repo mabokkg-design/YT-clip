@@ -116,33 +116,29 @@ def generate_premium_ass(chunks: list[dict], vid_w: int, vid_h: int) -> str:
         \\shad3\\4c&H99000000&               → per-line shadow override
     """
 
-    font     = _detect_font()
-    WHITE    = "&H00FFFFFF"   # #FFFFFF — primary text
-    YELLOW   = "&H0000D7FF"   # #FFD700 in ASS BGR (Blue=00, Green=D7, Red=FF)
-    SHADOW_C = "&H99000000"   # black @ 60% opacity  (0x99 = 153 ≈ 60% of 255)
-
+    font      = _detect_font()
+    WHITE     = "&H00FFFFFF"   # #FFFFFF — primary text
+    YELLOW    = "&H0000D7FF"   # #FFD700 in ASS BGR order
     font_size = int(vid_h * 0.038)  # 3.8vh equivalent
-    # 18% margin from bottom places text at ~82% down — sweet spot for shorts
-    margin_v  = int(vid_h * 0.22)  # 22% from bottom ≈ 78% down (Y=75-80%)
+    margin_v  = int(vid_h * 0.22)   # 22% from bottom ≈ 78% down (Y=75-80%)
 
     header = f"""\
 [Script Info]
 ScriptType: v4.00+
 PlayResX: {vid_w}
 PlayResY: {vid_h}
-WrapStyle: 0
+WrapStyle: 2
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{font_size},{WHITE},&H000000FF,&H00000000,{SHADOW_C},-1,0,0,0,100,100,-1,0,1,0,3,2,20,20,{margin_v},1
+Style: Default,{font},{font_size},{WHITE},&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,-1,0,0,0,0,2,20,20,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
     def _fmt(s: float) -> str:
-        """Format seconds → ASS timestamp  H:MM:SS.cc"""
         h   = int(s // 3600)
         m   = int((s % 3600) // 60)
         sec = s % 60
@@ -155,16 +151,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         t_end   = chunk["end"]
 
         if len(words) == 1:
-            # Single word alone = key moment → render fully in yellow
-            text = f"{{\\c{YELLOW}\\shad3\\4c{SHADOW_C}}}{words[0]}"
+            text = f"{{\\q2\\c{YELLOW}}}{words[0]}"
         else:
-            # 2+ words: body in white, LAST word in yellow (the emphasis word)
             body = " ".join(words[:-1])
             last = words[-1]
-            text = (
-                f"{{\\c{WHITE}\\shad3\\4c{SHADOW_C}}}{body} "
-                f"{{\\c{YELLOW}}}{last}{{\\c{WHITE}}}"
-            )
+            text = f"{{\\q2\\c{WHITE}}}{body} {{\\c{YELLOW}}}{last}{{\\c{WHITE}}}"
 
         lines.append(f"Dialogue: 0,{_fmt(t_start)},{_fmt(t_end)},Default,,0,0,0,,{text}")
 

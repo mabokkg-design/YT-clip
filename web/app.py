@@ -225,33 +225,32 @@ def chunk_transcript(transcript: list, clip_start: float, clip_end: float) -> li
 
 def generate_premium_ass(chunks: list, vid_w: int, vid_h: int) -> str:
     """
-    Build an ASS subtitle file styled after Iman Gadzhi's premium caption aesthetic:
+    Build an ASS subtitle file with clean, minimal captions.
       - Montserrat Black / Helvetica Neue Bold, ALL CAPS
       - Tight letter spacing (-1)
-      - Pure white body text, soft yellow (#FFD700) on the last word per chunk
-      - Soft drop shadow only — NO outline/stroke (BorderStyle=1, Outline=0, Shadow=3)
-      - Shadow color: black @ 50% opacity
-      - Position: center-bottom at ~80% down the frame
-      - Clean cuts — no animations
+      - Pure white body text, yellow (#FFD700) on the last word per chunk
+      - No shadow, no outline, no blur — fully clean
+      - Single straight line, no wrapping (WrapStyle=2, \\q2)
+      - Center-bottom at ~78% down the frame
+      - Instant cuts, no animation
     """
     font      = _font_name()
-    WHITE     = "&H00FFFFFF"   # #FFFFFF  — primary text
+    WHITE     = "&H00FFFFFF"   # #FFFFFF — primary text
     YELLOW    = "&H0000D7FF"   # #FFD700 in ASS BGR order
-    SHADOW_C  = "&H80000000"   # black @ 50% alpha — soft, not cheap
     font_size = int(vid_h * 0.038)  # 3.8vh equivalent
-    margin_v  = int(vid_h * 0.22)             # 22% from bottom ≈ 78% down (Y=75-80%)
+    margin_v  = int(vid_h * 0.22)   # 22% from bottom ≈ 78% down
 
     header = f"""\
 [Script Info]
 ScriptType: v4.00+
 PlayResX: {vid_w}
 PlayResY: {vid_h}
-WrapStyle: 0
+WrapStyle: 2
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{font_size},{WHITE},&H000000FF,&H00000000,{SHADOW_C},-1,0,0,0,100,100,-1,0,1,0,3,2,20,20,{margin_v},1
+Style: Default,{font},{font_size},{WHITE},&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,-1,0,0,0,0,2,20,20,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -270,16 +269,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         t_end   = chunk["end"]
 
         if len(words) == 1:
-            # Solo word → yellow (stands alone as emphasis)
-            text = f"{{\\c{YELLOW}\\shad3\\4c{SHADOW_C}}}{words[0]}"
+            text = f"{{\\q2\\c{YELLOW}}}{words[0]}"
         else:
-            # Body words in white, last word in yellow for emphasis
             body = " ".join(words[:-1])
             last = words[-1]
-            text = (
-                f"{{\\c{WHITE}\\shad3\\4c{SHADOW_C}}}{body} "
-                f"{{\\c{YELLOW}}}{last}{{\\c{WHITE}}}"
-            )
+            text = f"{{\\q2\\c{WHITE}}}{body} {{\\c{YELLOW}}}{last}{{\\c{WHITE}}}"
 
         lines.append(f"Dialogue: 0,{fmt(t_start)},{fmt(t_end)},Default,,0,0,0,,{text}")
 
