@@ -80,11 +80,20 @@ def format_transcript(transcript: list) -> str:
 
 FREE_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.1-8b-instruct:free",
     "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-2-9b-it:free",
+    "qwen/qwen3-14b:free",
+    "qwen/qwen3-8b:free",
+    "qwen/qwen3-30b-a3b:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "mistralai/mistral-nemo:free",
+    "mistralai/mistral-7b-instruct:free",
+    "deepseek/deepseek-r1:free",
+    "deepseek/deepseek-chat-v3-0324:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "openai/gpt-oss-120b:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemma-4-26b-a4b-it:free",
 ]
 
 
@@ -127,6 +136,18 @@ Transcript:
             return json.loads(text)
         except Exception as e:
             last_error = e
+            # On 429, wait the retry_after hint (or 10s) then try next model
+            err_str = str(e)
+            if "429" in err_str:
+                wait = 10
+                try:
+                    import re as _re
+                    m = _re.search(r"retry_after_seconds['\"]:\s*([\d.]+)", err_str)
+                    if m:
+                        wait = min(float(m.group(1)), 30)
+                except Exception:
+                    pass
+                await asyncio.sleep(wait)
             continue
 
     raise RuntimeError(f"All free models rate-limited. Last error: {last_error}")
