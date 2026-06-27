@@ -48,7 +48,7 @@ def _detect_font() -> str:
 # ---------------------------------------------------------------------------
 
 def chunk_transcript(transcript: list[dict], clip_start: float = 0.0,
-                     clip_end: float = float("inf"), words_per_chunk: int = 3) -> list[dict]:
+                     clip_end: float = float("inf"), words_per_chunk: int = 2) -> list[dict]:
     """
     Break transcript entries into rapid 2-word caption chunks.
 
@@ -123,7 +123,7 @@ def generate_premium_ass(chunks: list[dict], vid_w: int, vid_h: int) -> str:
 
     font_size = int(vid_h * 0.038)  # 3.8vh equivalent
     # 18% margin from bottom places text at ~82% down — sweet spot for shorts
-    margin_v  = int(vid_h * 0.18)
+    margin_v  = int(vid_h * 0.22)  # 22% from bottom ≈ 78% down (Y=75-80%)
 
     header = f"""\
 [Script Info]
@@ -191,7 +191,7 @@ def get_video_dimensions(video_path: str) -> tuple[int, int]:
 
 def burn_captions(video_path: str, transcript: list[dict], output_path: str,
                   clip_start: float = 0.0, clip_end: float = None,
-                  words_per_chunk: int = 3) -> None:
+                  words_per_chunk: int = 2) -> None:
     """
     Apply premium captions to a video and save to output_path.
 

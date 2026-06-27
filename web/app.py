@@ -208,7 +208,8 @@ def chunk_transcript(transcript: list, clip_start: float, clip_end: float) -> li
         if not words:
             continue
 
-        size = 3
+        # 2 words for rapid engagement; 3 only when phrase is very short
+        size = 2 if len(words) > 3 else 3
         groups = [words[i:i + size] for i in range(0, len(words), size)]
         seg_dur = adj_end - adj_start
         t_per = seg_dur / len(groups)
@@ -238,7 +239,7 @@ def generate_premium_ass(chunks: list, vid_w: int, vid_h: int) -> str:
     YELLOW    = "&H0000D7FF"   # #FFD700 in ASS BGR order
     SHADOW_C  = "&H80000000"   # black @ 50% alpha — soft, not cheap
     font_size = int(vid_h * 0.038)  # 3.8vh equivalent
-    margin_v  = int(vid_h * 0.18)             # 18% from bottom ≈ 82% down
+    margin_v  = int(vid_h * 0.22)             # 22% from bottom ≈ 78% down (Y=75-80%)
 
     header = f"""\
 [Script Info]
