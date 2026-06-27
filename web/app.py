@@ -287,11 +287,8 @@ def build_caption_clips(chunks: list, vid_w: int, vid_h: int, clip_duration: flo
 
 
 async def cut_clip(input_path: str, output_path: str, start: int, end: int,
-                   aspect_ratio: str, resolution: int, chunks: list = None):
+                   aspect_ratio: str, resolution: int):
     vf = _build_vf(aspect_ratio, resolution)
-    tmp_path = output_path + ".tmp.mp4"
-
-    # Step 1: ffmpeg cuts + crops the video (fast, no quality loss on text)
     cmd = [
         "ffmpeg", "-y",
         "-ss", str(start), "-i", input_path,
@@ -299,38 +296,16 @@ async def cut_clip(input_path: str, output_path: str, start: int, end: int,
         "-vf", vf,
         "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
-        tmp_path,
+        output_path,
     ]
 
-    def _run_ffmpeg():
+    def _run():
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"ffmpeg failed: {result.stderr[-500:]}")
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _run_ffmpeg)
-
-    if not chunks:
-        os.rename(tmp_path, output_path)
-        return
-
-    # Step 2: MoviePy burns in TextClip captions
-    def _render_captions():
-        video = VideoFileClip(tmp_path)
-        try:
-            vid_w, vid_h = int(video.w), int(video.h)
-            caption_clips = build_caption_clips(chunks, vid_w, vid_h, video.duration)
-            final = CompositeVideoClip([video] + caption_clips)
-            final.write_videofile(
-                output_path, codec="libx264", audio_codec="aac",
-                fps=video.fps, preset="fast", logger=None,
-            )
-        finally:
-            video.close()
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
-    await loop.run_in_executor(None, _render_captions)
+    await loop.run_in_executor(None, _run)
 
 
 async def process_job(job_id: str, req: GenerateRequest, api_key: str):
@@ -364,15 +339,10 @@ async def process_job(job_id: str, req: GenerateRequest, api_key: str):
                 clip_start = int(moment["start_seconds"])
                 clip_end   = int(moment["end_seconds"])
 
-                caption_chunks = (
-                    chunk_transcript(transcript, clip_start, clip_end)
-                    if req.subtitles else []
-                )
-
                 await cut_clip(
                     video_file, clip_path,
                     clip_start, clip_end,
-                    req.aspect_ratio, req.resolution, caption_chunks,
+                    req.aspect_ratio, req.resolution,
                 )
                 output.append({
                     "title": moment.get("title", f"Clip {i + 1}"),
